@@ -1,0 +1,234 @@
+﻿@page "/"
+@inject IAuthService AuthService
+@inject ICustomerService CustomerService
+@inject NavigationManager Navigation
+
+<PageTitle>Dashboard</PageTitle>
+
+<MudText Typo="Typo.h3" Class="mb-6">Dashboard</MudText>
+
+@if (_isAuthenticated)
+{
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="4">
+                <MudCardContent>
+                    <div class="d-flex justify-space-between">
+                        <div>
+                            <MudText Typo="Typo.h6" Color="Color.Primary">Total Customers</MudText>
+                            <MudText Typo="Typo.h4">@_totalCustomers</MudText>
+                        </div>
+                        <MudIcon Icon="Icons.Material.Filled.People" Size="Size.Large" Color="Color.Primary" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="4">
+                <MudCardContent>
+                    <div class="d-flex justify-space-between">
+                        <div>
+                            <MudText Typo="Typo.h6" Color="Color.Secondary">New This Month</MudText>
+                            <MudText Typo="Typo.h4">@_newCustomersThisMonth</MudText>
+                        </div>
+                        <MudIcon Icon="Icons.Material.Filled.PersonAdd" Size="Size.Large" Color="Color.Secondary" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="4">
+                <MudCardContent>
+                    <div class="d-flex justify-space-between">
+                        <div>
+                            <MudText Typo="Typo.h6" Color="Color.Tertiary">Active Customers</MudText>
+                            <MudText Typo="Typo.h4">@_activeCustomers</MudText>
+                        </div>
+                        <MudIcon Icon="Icons.Material.Filled.TrendingUp" Size="Size.Large" Color="Color.Tertiary" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="4">
+                <MudCardContent>
+                    <div class="d-flex justify-space-between">
+                        <div>
+                            <MudText Typo="Typo.h6" Color="Color.Info">Growth Rate</MudText>
+                            <MudText Typo="Typo.h4">+12%</MudText>
+                        </div>
+                        <MudIcon Icon="Icons.Material.Filled.Analytics" Size="Size.Large" Color="Color.Info" />
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-6">
+        <MudItem xs="12">
+            <MudCard Elevation="4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Recent Customers</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudButton Href="/customers" Color="Color.Primary" Variant="Variant.Text">View All</MudButton>
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (_recentCustomers?.Any() == true)
+                    {
+                        <MudList T="string">
+                            @foreach (var customer in _recentCustomers.Take(5))
+                            {
+                                <MudListItem T="string" @ondblclick="@(() => EditCustomer(customer.Id))" Style="cursor: pointer;">
+                                    <div class="d-flex justify-space-between align-center">
+                                        <div class="d-flex align-center">
+                                            <MudAvatar Color="Color.Primary" Class="mr-3">
+                                                @GetAvatarInitials(customer)
+                                            </MudAvatar>
+                                            <div>
+                                                <MudText>@customer.FullName</MudText>
+                                                <MudText Typo="Typo.body2" Color="Color.Secondary">@customer.Email</MudText>
+                                            </div>
+                                        </div>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                            @customer.CreatedDate.ToString("MMM dd, yyyy")
+                                        </MudText>
+                                    </div>
+                                </MudListItem>
+                                <MudDivider />
+                            }
+                        </MudList>
+                    }
+                    else
+                    {
+                        <MudText Color="Color.Secondary" Class="text-center py-4">No customers yet. Add your first customer!</MudText>
+                        <div class="d-flex justify-center mt-4">
+                            <MudButton Href="/customers/create" Color="Color.Primary" Variant="Variant.Filled" StartIcon="Icons.Material.Filled.Add">
+                                Add Customer
+                            </MudButton>
+                        </div>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" Class="d-flex justify-center">
+            <MudCard Elevation="4" Style="max-width: 600px;">
+                <MudCardContent Class="pa-8">
+                    <div class="d-flex justify-center mb-4">
+                        <MudIcon Icon="Icons.Material.Filled.BusinessCenter" Size="Size.Large" Color="Color.Primary" />
+                    </div>
+                    <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-4">Welcome to My Customers</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="mb-6">
+                        Manage your customer relationships with ease. Track contacts, organize data, and grow your business.
+                    </MudText>
+                    <div class="d-flex justify-center gap-4">
+                        <MudButton Href="/login" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Large">
+                            Login
+                        </MudButton>
+                        <MudButton Href="/register" Color="Color.Secondary" Variant="Variant.Outlined" Size="Size.Large">
+                            Register
+                        </MudButton>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool _isAuthenticated = false;
+    private int _totalCustomers = 0;
+    private int _newCustomersThisMonth = 0;
+    private int _activeCustomers = 0;
+    private IEnumerable<Customer>? _recentCustomers;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        
+        if (_isAuthenticated)
+        {
+            await LoadDashboardData();
+        }
+        
+        AuthService.AuthStateChanged += OnAuthStateChanged;
+    }
+
+    private async Task LoadDashboardData()
+    {
+        try
+        {
+            // Request a modest page of recent customers for dashboard display
+            var paged = await CustomerService.GetCustomersAsync(0, 100);
+            var customers = paged?.Items ?? Array.Empty<Customer>();
+
+            _recentCustomers = customers.OrderByDescending(c => c.CreatedDate);
+            _totalCustomers = paged?.TotalCount ?? customers.Count();
+            _newCustomersThisMonth = customers.Count(c => c.CreatedDate >= DateTime.Now.AddDays(-30));
+            _activeCustomers = customers.Count(); // Placeholder - you might want to add an IsActive property
+        }
+        catch (Exception)
+        {
+            // Handle error silently for dashboard
+        }
+    }
+
+    private async void OnAuthStateChanged(bool isAuthenticated)
+    {
+        _isAuthenticated = isAuthenticated;
+        
+        if (_isAuthenticated)
+        {
+            await LoadDashboardData();
+        }
+        else
+        {
+            _recentCustomers = null;
+            _totalCustomers = 0;
+            _newCustomersThisMonth = 0;
+            _activeCustomers = 0;
+        }
+        
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void EditCustomer(Guid customerId)
+    {
+        Navigation.NavigateTo($"/customers/edit/{customerId}");
+    }
+
+    private string GetAvatarInitials(Customer customer)
+    {
+        if (!string.IsNullOrEmpty(customer.FirstName) && !string.IsNullOrEmpty(customer.LastName))
+        {
+            return $"{customer.FirstName.Substring(0, 1)}{customer.LastName.Substring(0, 1)}";
+        }
+        
+        if (!string.IsNullOrEmpty(customer.Name))
+        {
+            var parts = customer.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2)
+            {
+                return $"{parts[0].Substring(0, 1)}{parts[1].Substring(0, 1)}";
+            }
+            return customer.Name.Substring(0, Math.Min(2, customer.Name.Length));
+        }
+        
+        return "??";
+    }
+
+    public void Dispose()
+    {
+        AuthService.AuthStateChanged -= OnAuthStateChanged;
+    }
+}

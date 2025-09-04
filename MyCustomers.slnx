@@ -1,0 +1,12 @@
+<Solution>
+  <Project Path="MyCustomers.AppHost/MyCustomers.AppHost.csproj" />
+  <Project Path="MyCustomers.Application.Contracts/MyCustomers.Application.Contracts.csproj" />
+  <Project Path="MyCustomers.Application/MyCustomers.Application.csproj" />
+  <Project Path="MyCustomers.Domain.Shared/MyCustomers.Domain.Shared.csproj" />
+  <Project Path="MyCustomers.Domain/MyCustomers.Domain.csproj" />
+  <Project Path="MyCustomers.Infrastructure.Persistence/MyCustomers.Infrastructure.Persistence.csproj" />
+  <Project Path="MyCustomers.Infrastructure/MyCustomers.Infrastructure.csproj" />
+  <Project Path="MyCustomers.ServiceDefaults/MyCustomers.ServiceDefaults.csproj" />
+  <Project Path="MyCustomers.WebApi/MyCustomers.WebApi.csproj" />
+  <Project Path="MyCustomersApp/MyCustomersApp.csproj" />
+</Solution>

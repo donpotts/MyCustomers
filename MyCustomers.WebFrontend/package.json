@@ -1,0 +1,41 @@
+{
+  "name": "mycustomers-webfrontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@emotion/cache": "^11",
+    "@emotion/react": "^11",
+    "@emotion/styled": "^11",
+    "@mui/icons-material": "^7",
+    "@mui/material": "^7",
+    "@mui/material-nextjs": "^7",
+    "@opentelemetry/exporter-trace-otlp-grpc": "^0.46.0",
+    "@vercel/otel": "^1.13.0",
+    "change-case": "^5",
+    "next": "~15.5",
+    "next-auth": "^4",
+    "react": "~19.1",
+    "react-dom": "~19.1",
+    "title-case": "^4",
+    "uuid": "^11",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@trivago/prettier-plugin-sort-imports": "^5",
+    "@types/node": "^20",
+    "@types/react": "~19.1",
+    "@types/react-dom": "~19.1",
+    "eslint": "^9",
+    "eslint-config-next": "~15.5",
+    "eslint-config-prettier": "^10",
+    "prettier": "^3",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,108 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@using MudBlazor
+@inject IThemeService ThemeService
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+
+<MudThemeProvider Theme="@ThemeService.CurrentTheme" IsDarkMode="@ThemeService.IsDarkMode" />
+@* Removed duplicate MudDialogProvider. Only keep the one in App.razor. *@
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Class="main-appbar">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" 
+                       Color="Color.Inherit" 
+                       OnClick="@ToggleDrawer" 
+                       Size="Size.Medium"
+                       Style="color: white !important;"
+                       title="Toggle Menu"
+                       Class="menu-button" />
+        <MudText Typo="Typo.h6" Class="app-title">My Customers</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Inherit" 
+                   OnClick="@ToggleTheme" 
+                   Class="theme-toggle-btn"
+                   title="@(ThemeService.IsDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode")"
+                   Style="font-size: 20px; min-width: 48px;">
+            @(ThemeService.IsDarkMode ? "🌙" : "☀️")
+        </MudButton>
+        @if (_isAuthenticated)
+        {
+            <MudMenu Icon="Icons.Material.Filled.Person" 
+                     Color="Color.Inherit" 
+                     direction="Direction.Left" 
+                     offsetX="true"
+                     Class="user-menu">
+                <MudMenuItem OnClick="@HandleLogout">
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="Icons.Material.Filled.Logout" class="mr-2" />
+                        <MudText>Logout</MudText>
+                    </div>
+                </MudMenuItem>
+            </MudMenu>
+        }
+    </MudAppBar>
+    
+    <MudDrawer @bind-Open="_drawerOpen" 
+               Variant="@DrawerVariant.Persistent" 
+               ClipMode="DrawerClipMode.Always"
+               Elevation="2"
+               Width="280px"
+               Class="main-drawer">
+        <div class="drawer-content">
+            <NavMenu IsOpen="_drawerOpen" />
+        </div>
+    </MudDrawer>
+    
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4 pt-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _isAuthenticated = false;
+    private bool _drawerOpen = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        AuthService.AuthStateChanged += OnAuthStateChanged;
+        ThemeService.OnThemeChanged += StateHasChanged;
+        
+        // Initialize theme service to load saved theme preference
+        await ThemeService.InitializeAsync();
+    }
+
+    private void OnAuthStateChanged(bool isAuthenticated)
+    {
+        _isAuthenticated = isAuthenticated;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    private async Task ToggleTheme()
+    {
+        await ThemeService.ToggleThemeAsync();
+        //Snackbar.Add($"Theme switched to {(ThemeService.IsDarkMode ? "Dark" : "Light")} mode", Severity.Info);
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Snackbar.Add("Logged out successfully", Severity.Success);
+    }
+
+    public void Dispose()
+    {
+        AuthService.AuthStateChanged -= OnAuthStateChanged;
+        ThemeService.OnThemeChanged -= StateHasChanged;
+    }
+}

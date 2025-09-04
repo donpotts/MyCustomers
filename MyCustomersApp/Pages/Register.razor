@@ -1,0 +1,141 @@
+@page "/register"
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Register</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex justify-center align-center" Style="min-height: 80vh;">
+    <MudPaper Elevation="4" Class="pa-8" Style="width: 100%; max-width: 400px;">
+        <div class="d-flex justify-center mb-6">
+            <MudIcon Icon="Icons.Material.Filled.PersonAdd" Size="Size.Large" Color="Color.Primary" />
+        </div>
+        
+        <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-6">Register</MudText>
+        
+        <EditForm Model="@_registerRequest" OnValidSubmit="@HandleRegister">
+            <DataAnnotationsValidator />
+            
+            <MudTextField @bind-Value="_registerRequest.FirstName"
+                         Label="First Name"
+                         Variant="Variant.Outlined"
+                         Adornment="Adornment.Start"
+                         AdornmentIcon="Icons.Material.Filled.Person"
+                         Class="mb-4"
+                         For="@(() => _registerRequest.FirstName)"
+                         Required="true" />
+                         
+            <MudTextField @bind-Value="_registerRequest.LastName"
+                         Label="Last Name"
+                         Variant="Variant.Outlined"
+                         Adornment="Adornment.Start"
+                         AdornmentIcon="Icons.Material.Filled.Person"
+                         Class="mb-4"
+                         For="@(() => _registerRequest.LastName)"
+                         Required="true" />
+                         
+            <MudTextField @bind-Value="_registerRequest.Email"
+                         Label="Email"
+                         Variant="Variant.Outlined"
+                         InputType="InputType.Email"
+                         Adornment="Adornment.Start"
+                         AdornmentIcon="Icons.Material.Filled.Email"
+                         Class="mb-4"
+                         For="@(() => _registerRequest.Email)"
+                         Required="true" />
+                         
+            <MudTextField @bind-Value="_registerRequest.Password"
+                         Label="Password"
+                         Variant="Variant.Outlined"
+                         InputType="InputType.Password"
+                         Adornment="Adornment.Start"
+                         AdornmentIcon="Icons.Material.Filled.Lock"
+                         Class="mb-4"
+                         For="@(() => _registerRequest.Password)"
+                         Required="true" />
+                         
+            <MudTextField @bind-Value="_registerRequest.ConfirmPassword"
+                         Label="Confirm Password"
+                         Variant="Variant.Outlined"
+                         InputType="InputType.Password"
+                         Adornment="Adornment.Start"
+                         AdornmentIcon="Icons.Material.Filled.Lock"
+                         Class="mb-4"
+                         For="@(() => _registerRequest.ConfirmPassword)"
+                         Required="true"
+                         Validation="@(new Func<string, string>(PasswordMatch))" />
+                         
+            <MudButton ButtonType="ButtonType.Submit"
+                      Variant="Variant.Filled"
+                      Color="Color.Primary"
+                      Size="Size.Large"
+                      FullWidth="true"
+                      Class="mb-4"
+                      Disabled="@_isLoading">
+                @if (_isLoading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    <span class="ml-2">Creating Account...</span>
+                }
+                else
+                {
+                    <span>Create Account</span>
+                }
+            </MudButton>
+        </EditForm>
+        
+        <MudDivider Class="my-4" />
+        
+        <div class="d-flex justify-center">
+            <MudText>Already have an account?</MudText>
+            <MudLink Href="/login" Class="ml-2">Login here</MudLink>
+        </div>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private RegisterRequest _registerRequest = new();
+    private bool _isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        if (isAuthenticated)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private string PasswordMatch(string confirmPassword)
+    {
+        if (_registerRequest.Password != confirmPassword)
+            return "Passwords don't match";
+        return null!;
+    }
+
+    private async Task HandleRegister()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await AuthService.RegisterAsync(_registerRequest);
+            if (result.Success)
+            {
+                Snackbar.Add(result.Message ?? "Registration successful! Please log in.", Severity.Success);
+                Navigation.NavigateTo("/login");
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Registration failed. Please try again.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("An error occurred during registration. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

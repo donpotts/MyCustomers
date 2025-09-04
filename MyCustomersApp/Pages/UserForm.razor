@@ -1,0 +1,300 @@
+@page "/users/create"
+@page "/users/edit/{UserId}"
+@using MudBlazor
+@inject IUserService UserService
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsEditMode ? "Edit User" : "Add User")</PageTitle>
+
+@if (!_isAuthorized)
+{
+    <MudContainer MaxWidth="MaxWidth.Medium" Class="pa-6">
+        <MudCard Elevation="2" Class="pa-8">
+            <MudCardContent Class="text-center">
+                <MudIcon Icon="Icons.Material.Filled.Lock" Size="Size.Large" Color="Color.Warning" Class="mb-4" />
+                <MudText Typo="Typo.h5" Class="mb-2">Access Denied</MudText>
+                <MudText Color="Color.Secondary" Class="mb-4">
+                    You need administrator privileges to manage users.
+                </MudText>
+                <MudButton Href="/users" 
+                          Color="Color.Primary" 
+                          Variant="Variant.Filled" 
+                          StartIcon="Icons.Material.Filled.ArrowBack">
+                    Back to Users
+                </MudButton>
+            </MudCardContent>
+        </MudCard>
+    </MudContainer>
+}
+else
+{
+<MudContainer MaxWidth="MaxWidth.Medium">
+    <div class="d-flex align-center mb-6">
+        <MudIconButton Icon="Icons.Material.Filled.ArrowBack" 
+                      Color="Color.Primary" 
+                      OnClick="@(() => Navigation.NavigateTo("/users"))" 
+                      Class="mr-3" />
+        <MudText Typo="Typo.h4">@(IsEditMode ? "Edit User" : "Add New User")</MudText>
+    </div>
+
+    <MudCard Elevation="4">
+        <MudCardContent Class="pa-8">
+            @if (_isLoading)
+            {
+                <div class="d-flex justify-center align-center" style="min-height: 200px;">
+                    <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+                </div>
+            }
+            else
+            {
+                <EditForm Model="@_userRequest" OnValidSubmit="@HandleSubmit">
+                    <DataAnnotationsValidator />
+
+                    <MudStack Spacing="4">
+                        <MudTextField @bind-Value="_email"
+                                     Label="Email Address"
+                                     Variant="Variant.Filled"
+                                     InputType="InputType.Email"
+                                     Required="true"
+                                     RequiredError="Email is required"
+                                     FullWidth="true" />
+                        
+                        @if (!IsEditMode)
+                        {
+                            <MudGrid>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField @bind-Value="_password"
+                                                 Label="Password"
+                                                 Variant="Variant.Filled"
+                                                 InputType="InputType.Password"
+                                                 Required="true"
+                                                 RequiredError="Password is required"
+                                                 FullWidth="true" />
+                                </MudItem>
+                                
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField @bind-Value="_confirmPassword"
+                                                 Label="Confirm Password"
+                                                 Variant="Variant.Filled"
+                                                 InputType="InputType.Password"
+                                                 Required="true"
+                                                 RequiredError="Please confirm your password"
+                                                 Validation="@(new Func<string, string>(PasswordMatch))"
+                                                 FullWidth="true" />
+                                </MudItem>
+                            </MudGrid>
+                        }
+                        else
+                        {
+                            <MudGrid>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField @bind-Value="_newPassword"
+                                                 Label="New Password"
+                                                 HelperText="Leave blank to keep current password"
+                                                 Variant="Variant.Filled"
+                                                 InputType="InputType.Password"
+                                                 FullWidth="true" />
+                                </MudItem>
+                                
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField @bind-Value="_confirmNewPassword"
+                                                 Label="Confirm New Password"
+                                                 Variant="Variant.Filled"
+                                                 InputType="InputType.Password"
+                                                 Validation="@(new Func<string, string>(NewPasswordMatch))"
+                                                 FullWidth="true" />
+                                </MudItem>
+                            </MudGrid>
+                        }
+
+                        <MudPaper Class="pa-4" Elevation="1">
+                            <MudSwitch @bind-Value="_isAdmin"
+                                      Label="Administrator Privileges"
+                                      Color="Color.Primary" />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                                Administrators can manage users and access all system features
+                            </MudText>
+                        </MudPaper>
+                    </MudStack>
+
+                    <MudDivider Class="my-6" />
+
+                    <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="3" Class="mt-6">
+                        <MudButton Color="Color.Secondary" 
+                                  Variant="Variant.Outlined" 
+                                  OnClick="@(() => Navigation.NavigateTo("/users"))"
+                                  Disabled="@_isSaving">
+                            Cancel
+                        </MudButton>
+                        
+                        <MudButton ButtonType="ButtonType.Submit"
+                                  Color="Color.Primary"
+                                  Variant="Variant.Filled"
+                                  Size="Size.Large"
+                                  StartIcon="@(_isSaving ? Icons.Material.Filled.HourglassEmpty : (IsEditMode ? Icons.Material.Filled.Save : Icons.Material.Filled.PersonAdd))"
+                                  Disabled="@_isSaving">
+                            @if (_isSaving)
+                            {
+                                <span>@(IsEditMode ? "Updating..." : "Creating...")</span>
+                            }
+                            else
+                            {
+                                <span>@(IsEditMode ? "Update User" : "Create User")</span>
+                            }
+                        </MudButton>
+                    </MudStack>
+                </EditForm>
+            }
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+}
+
+@code {
+    [Parameter] public string UserId { get; set; } = string.Empty;
+    
+    private UpdateUserRequest _userRequest = new();
+    private string _email = string.Empty;
+    private string _password = string.Empty;
+    private string _confirmPassword = string.Empty;
+    private string _newPassword = string.Empty;
+    private string _confirmNewPassword = string.Empty;
+    private bool _isAdmin = false;
+    private bool _isLoading = false;
+    private bool _isSaving = false;
+    private bool _isAuthorized = false;
+
+    private bool IsEditMode => !string.IsNullOrEmpty(UserId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckAuthorization();
+        if (_isAuthorized)
+        {
+            if (IsEditMode)
+            {
+                await LoadUser(UserId);
+            }
+        }
+    }
+
+    private async Task CheckAuthorization()
+    {
+        try
+        {
+            var currentUser = await AuthService.GetCurrentUserAsync();
+            _isAuthorized = currentUser != null && currentUser.IsAdmin;
+            
+            if (!_isAuthorized)
+            {
+                Snackbar.Add("Access denied. Administrator privileges required.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _isAuthorized = false;
+            Snackbar.Add("Failed to verify authorization.", Severity.Error);
+        }
+    }
+
+    private async Task LoadUser(string userId)
+    {
+        _isLoading = true;
+        try
+        {
+            var user = await UserService.GetUserAsync(userId);
+            if (user != null)
+            {
+                _email = user.Email ?? string.Empty;
+                _isAdmin = user.IsAdmin;
+            }
+            else
+            {
+                Snackbar.Add("User not found.", Severity.Error);
+                Navigation.NavigateTo("/users");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Failed to load user. Please try again.", Severity.Error);
+            Navigation.NavigateTo("/users");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        _isSaving = true;
+        try
+        {
+            if (IsEditMode)
+            {
+                var updateRequest = new UpdateUserRequest
+                {
+                    NewEmail = string.IsNullOrEmpty(_email) ? null : _email,
+                    NewPassword = string.IsNullOrEmpty(_newPassword) ? null : _newPassword,
+                    IsAdmin = _isAdmin
+                };
+                
+                var result = await UserService.UpdateUserAsync(UserId, updateRequest);
+                if (result != null)
+                {
+                    Snackbar.Add($"User {_email} has been updated successfully.", Severity.Success);
+                    Navigation.NavigateTo("/users");
+                }
+                else
+                {
+                    Snackbar.Add("Failed to update user. Please try again.", Severity.Error);
+                }
+            }
+            else
+            {
+                var createRequest = new CreateUserRequest
+                {
+                    Email = _email,
+                    Password = _password,
+                    IsAdmin = _isAdmin
+                };
+                
+                var result = await UserService.CreateUserAsync(createRequest);
+                if (result != null)
+                {
+                    Snackbar.Add($"User {_email} has been created successfully.", Severity.Success);
+                    Navigation.NavigateTo("/users");
+                }
+                else
+                {
+                    Snackbar.Add("Failed to create user. Please try again.", Severity.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            var action = IsEditMode ? "updating" : "creating";
+            Snackbar.Add($"An error occurred while {action} the user.", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private string PasswordMatch(string confirmPassword)
+    {
+        if (_password != confirmPassword)
+            return "Passwords don't match";
+        return null!;
+    }
+    
+    private string NewPasswordMatch(string confirmNewPassword)
+    {
+        if (!string.IsNullOrEmpty(_newPassword) && _newPassword != confirmNewPassword)
+            return "New passwords don't match";
+        return null!;
+    }
+}

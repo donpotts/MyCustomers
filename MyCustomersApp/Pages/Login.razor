@@ -1,0 +1,105 @@
+@page "/login"
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Login</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex justify-center align-center" Style="min-height: 80vh;">
+    <MudPaper Elevation="4" Class="pa-8" Style="width: 100%; max-width: 400px;">
+        <div class="d-flex justify-center mb-6">
+            <MudIcon Icon="Icons.Material.Filled.Person" Size="Size.Large" Color="Color.Primary" />
+        </div>
+        
+        <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-6">Login</MudText>
+        
+        <EditForm Model="@_loginRequest" OnValidSubmit="@HandleLogin">
+            <DataAnnotationsValidator />
+            
+            <MudTextField @bind-Value="_loginRequest.Email"
+                         Label="Email"
+                         Variant="Variant.Outlined"
+                         InputType="InputType.Email"
+                         Adornment="Adornment.Start"
+                         AdornmentIcon="Icons.Material.Filled.Email"
+                         Class="mb-4"
+                         For="@(() => _loginRequest.Email)"
+                         Required="true" />
+                         
+            <MudTextField @bind-Value="_loginRequest.Password"
+                         Label="Password"
+                         Variant="Variant.Outlined"
+                         InputType="InputType.Password"
+                         Adornment="Adornment.Start"
+                         AdornmentIcon="Icons.Material.Filled.Lock"
+                         Class="mb-4"
+                         For="@(() => _loginRequest.Password)"
+                         Required="true" />
+                         
+            <MudButton ButtonType="ButtonType.Submit"
+                      Variant="Variant.Filled"
+                      Color="Color.Primary"
+                      Size="Size.Large"
+                      FullWidth="true"
+                      Class="mb-4"
+                      Disabled="@_isLoading">
+                @if (_isLoading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                    <span class="ml-2">Signing In...</span>
+                }
+                else
+                {
+                    <span>Sign In</span>
+                }
+            </MudButton>
+        </EditForm>
+        
+        <MudDivider Class="my-4" />
+        
+        <div class="d-flex justify-center">
+            <MudText>Don't have an account?</MudText>
+            <MudLink Href="/register" Class="ml-2">Register here</MudLink>
+        </div>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private LoginRequest _loginRequest = new();
+    private bool _isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        if (isAuthenticated)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        _isLoading = true;
+        try
+        {
+            var result = await AuthService.LoginAsync(_loginRequest);
+            if (result.Success)
+            {
+                Snackbar.Add("Login successful! Welcome back.", Severity.Success);
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                Snackbar.Add(result.Message ?? "Login failed. Please try again.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("An error occurred during login. Please try again.", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

@@ -1,0 +1,422 @@
+@page "/customers"
+@using MudBlazor
+@using MudBlazor.Extensions
+@inject ICustomerService CustomerService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+
+<PageTitle>Customers</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-6">
+    <MudText Typo="Typo.h3">Customers</MudText>
+    <div class="d-flex gap-2">
+        <MudToggleIconButton @bind-Toggled="@_isCardView"
+                           Icon="@Icons.Material.Filled.GridView"
+                           ToggledIcon="@Icons.Material.Filled.ViewList"
+                           title="Toggle View"
+                           toggledTitle="Toggle View" />
+        <!-- Mobile version - Icon only, smaller size -->
+        <MudIconButton Href="/customers/create" 
+              Icon="@Icons.Material.Filled.Add"
+              Color="Color.Primary" 
+              Variant="Variant.Filled" 
+              Size="Size.Small"
+              Class="d-flex d-sm-none"
+              Title="Add Customer" />
+        <!-- Desktop version - Full button with text -->
+        <MudButton Href="/customers/create" 
+                  Color="Color.Primary" 
+                  Variant="Variant.Filled" 
+                  StartIcon="@Icons.Material.Filled.Add"
+                  Class="d-none d-sm-inline-flex">
+            Add Customer
+        </MudButton>
+        <!-- Temporary test: Remove responsive classes to see if icon shows -->
+    </div>
+</div>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-0">
+    <MudTextField @bind-Value="_searchString"
+                  Placeholder="Search customers..."
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="Icons.Material.Filled.Search"
+                  IconSize="Size.Medium"
+                  Class="mb-4"
+                  Clearable="true"
+                  Immediate="true" 
+                  OnClearButtonClick="@(() => SearchChanged(string.Empty))" />
+
+    @if (_isLoading)
+    {
+        <div class="d-flex justify-center align-center" style="min-height: 300px;">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+        </div>
+    }
+    else if (_customers?.Any() != true)
+    {
+        <MudCard Elevation="2" Class="pa-8">
+            <MudCardContent Class="text-center">
+                <MudIcon Icon="Icons.Material.Filled.PeopleOutline" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
+                <MudText Typo="Typo.h6" Class="mb-2">No customers found</MudText>
+                <MudText Color="Color.Secondary" Class="mb-4">Get started by adding your first customer</MudText>
+                <MudButton Href="/customers/create" Color="Color.Primary" Variant="Variant.Filled" StartIcon="Icons.Material.Filled.Add">
+                    Add Customer
+                </MudButton>
+            </MudCardContent>
+        </MudCard>
+    }
+    else
+    {
+        @if (_isCardView)
+        {
+            <MudGrid>
+                @foreach (var customer in PaginatedCustomers)
+                {
+                    <MudItem xs="12" sm="6" md="6" lg="4">
+                        <MudCard Elevation="4" Class="mud-card-hover customer-card" @ondblclick="@(() => EditCustomer(customer.Id))" Style="cursor: pointer;">
+                            <MudCardContent Class="customer-card-content">
+                                <div class="d-flex align-center mb-3">
+                                    <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mr-3">
+                                        @GetAvatarInitials(customer)
+                                    </MudAvatar>
+                                    <div class="flex-grow-1">
+                                        <MudText Typo="Typo.h6">@customer.FullName</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">@customer.Email</MudText>
+                                    </div>
+                                </div>
+                                
+                                @if (!string.IsNullOrEmpty(customer.Number))
+                                {
+                                    <div class="d-flex align-center mb-2">
+                                        <MudIcon Icon="Icons.Material.Filled.Phone" Size="Size.Small" Class="mr-2" />
+                                        <MudText Typo="Typo.body2">@customer.Number</MudText>
+                                    </div>
+                                }
+                                
+                                @if (!string.IsNullOrEmpty(customer.Notes))
+                                {
+                                    <div class="d-flex align-center mb-2">
+                                        <MudIcon Icon="Icons.Material.Filled.Notes" Size="Size.Small" Class="mr-2" />
+                                        <MudText Typo="Typo.body2">@customer.Notes</MudText>
+                                    </div>
+                                }
+                                
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Added: @customer.CreatedDate.ToString("MMM dd, yyyy")
+                                </MudText>
+                            </MudCardContent>
+                            
+                            <MudCardActions Class="d-flex justify-end pa-4 mt-auto">
+                                <div class="d-flex gap-2">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                  Color="Color.Primary"
+                                                  Variant="Variant.Filled"
+                                                  Size="Size.Medium"
+                                                  title="Edit Customer"
+                                                  OnClick="@(() => EditCustomer(customer.Id))" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                  Color="Color.Error"
+                                                  Variant="Variant.Filled"
+                                                  Size="Size.Medium"
+                                                  title="Delete Customer"
+                                                  OnClick="@(async () => await DeleteCustomer(customer))" />
+                                </div>
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+            
+            <MudCard Elevation="2" Class="mt-4">
+                <MudCardContent Class="py-2">
+                    <div class="d-flex justify-space-between align-center flex-wrap">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-0 mr-4">
+                            Showing @((_currentPage - 1) * _pageSize + 1)-@Math.Min(_currentPage * _pageSize, _totalCount) of @_totalCount customers
+                        </MudText>
+                        <div class="d-flex align-center">
+                            <MudPagination Count="@TotalPages" 
+                                         SelectedChanged="OnPageChanged" 
+                                         Selected="@_currentPage" 
+                                         Color="Color.Primary" 
+                                         Size="Size.Medium" 
+                                         Class="mb-0 mr-4" />
+                            <MudSelect T="int" 
+                                     Label="Items per page" 
+                                     Value="_pageSize" 
+                                     ValueChanged="PageSizeChanged"
+                                     Dense="true" 
+                                     Class="ma-0" 
+                                     Style="width:120px;" 
+                                     AnchorOrigin="Origin.BottomCenter">
+                                <MudSelectItem Value="6">6</MudSelectItem>
+                                <MudSelectItem Value="12">12</MudSelectItem>
+                                <MudSelectItem Value="18">18</MudSelectItem>
+                                <MudSelectItem Value="36">36</MudSelectItem>
+                                <MudSelectItem Value="50">50</MudSelectItem>
+                                <MudSelectItem Value="100">100</MudSelectItem>
+                            </MudSelect>
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        }
+        else
+        {
+            <MudCard Elevation="4">
+                <MudTable Items="@FilteredCustomers" 
+                         Hover="true" 
+                         Striped="true" 
+                         Dense="true"
+                         FixedHeader="true"
+                         Height="60vh"
+                         Bordered="false"
+                         Outlined="false"
+                         ServerData="@(new Func<TableState, CancellationToken, Task<TableData<Customer>>>(ServerReload))"
+                         Virtualize="true">
+                    <HeaderContent>
+                        <MudTh>Name</MudTh>
+                        <MudTh>Email</MudTh>
+                        <MudTh>Phone</MudTh>
+                        <MudTh>Notes</MudTh>
+                        <MudTh>Created</MudTh>
+                        <MudTh Style="width: 120px;">Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd @ondblclick="@(() => EditCustomer(context.Id))" Style="cursor: pointer;">
+                            <div class="d-flex align-center">
+                                <MudAvatar Color="Color.Primary" Size="Size.Small" Class="mr-3">
+                                    @GetAvatarInitials(context)
+                                </MudAvatar>
+                                @context.FullName
+                            </div>
+                        </MudTd>
+                        <MudTd @ondblclick="@(() => EditCustomer(context.Id))" Style="cursor: pointer;">@context.Email</MudTd>
+                        <MudTd @ondblclick="@(() => EditCustomer(context.Id))" Style="cursor: pointer;">@(context.Number ?? "N/A")</MudTd>
+                        <MudTd @ondblclick="@(() => EditCustomer(context.Id))" Style="cursor: pointer;">@(context.Notes ?? "N/A")</MudTd>
+                        <MudTd @ondblclick="@(() => EditCustomer(context.Id))" Style="cursor: pointer;">@context.CreatedDate.ToString("MMM dd, yyyy")</MudTd>
+                        <MudTd>
+                            <div class="d-flex gap-1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                              Color="Color.Primary"
+                                              Variant="Variant.Filled"
+                                              Size="Size.Small"
+                                              title="Edit Customer"
+                                              OnClick="@(() => EditCustomer(context.Id))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                              Color="Color.Error"
+                                              Variant="Variant.Filled"
+                                              Size="Size.Small"
+                                              title="Delete Customer"
+                                              OnClick="@(async () => await DeleteCustomer(context))" />
+                            </div>
+                        </MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[] { 6, 12, 18, 36, 50, 100 }" 
+                                     RowsPerPageString="Customers per page:" />
+                    </PagerContent>
+                </MudTable>
+            </MudCard>
+        }
+    }
+</MudContainer>
+
+<style>
+    .mud-card-hover {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
+
+    .mud-card-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+
+    .customer-card {
+        height: 280px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .customer-card-content {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+    }
+
+    .customer-card-content > div:last-child {
+        margin-top: auto;
+    }
+</style>
+
+@code {
+    private IEnumerable<Customer>? _customers;
+    private bool _isLoading = true;
+    private bool _isCardView = true;
+    private string _searchString = string.Empty;
+    
+    // Pagination settings
+    private int _pageSize = 6; // initial page size for cards
+    private int _currentPage = 1;
+    private int _totalCount = 0;
+    
+    // Table pagination
+    private MudBlazor.TableState _tableState = new MudBlazor.TableState();
+
+    private IEnumerable<Customer> FilteredCustomers
+    {
+        get
+        {
+            if (_customers == null) return Array.Empty<Customer>();
+            
+            var filtered = string.IsNullOrWhiteSpace(_searchString) 
+                ? _customers 
+                : _customers.Where(c => 
+                    c.FullName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+                    c.Email.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+                    (c.Number?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true) ||
+                    (c.Notes?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) == true));
+
+            return filtered;
+        }
+    }
+    
+    private IEnumerable<Customer> PaginatedCustomers => _customers ?? Array.Empty<Customer>();
+
+    private int TotalPages => (int)Math.Ceiling(_totalCount / (double)_pageSize);
+    
+    private void GoToPage(int page)
+    {
+        _currentPage = Math.Max(1, Math.Min(page, TotalPages));
+    }
+    
+    private async Task OnPageChanged(int page)
+    {
+        _currentPage = page;
+        await LoadCustomers();
+    }
+    
+    private async Task PageSizeChanged(int size)
+    {
+        _pageSize = size;
+        _currentPage = 1; // Reset to first page when page size changes
+        await LoadCustomers();
+    }
+    
+    private void SearchChanged(string searchText)
+    {
+        _searchString = searchText;
+        _currentPage = 1; // Reset to first page when search changes
+        StateHasChanged();
+    }
+    
+    private async Task<TableData<Customer>> ServerReload(MudBlazor.TableState state, CancellationToken cancellationToken)
+    {
+        _tableState = state;
+        
+        await Task.Delay(1, cancellationToken); // Simulate server call
+        
+        var skip = state.Page * state.PageSize;
+        var take = state.PageSize;
+
+        var paged = await CustomerService.GetCustomersAsync(skip, take);
+        var items = paged?.Items ?? Array.Empty<Customer>();
+        var total = paged?.TotalCount ?? 0;
+
+        return new TableData<Customer>() 
+        { 
+            TotalItems = total, 
+            Items = items 
+        };
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+
+    private async Task LoadCustomers()
+    {
+        _isLoading = true;
+        try
+        {
+            var skip = (_currentPage - 1) * _pageSize;
+            var paged = await CustomerService.GetCustomersAsync(skip, _pageSize);
+            _customers = paged?.Items ?? Array.Empty<Customer>();
+            _totalCount = paged?.TotalCount ?? 0;
+        }
+        catch (Exception ex)
+        {
+            // Surface error to the user and log for debugging
+            Snackbar.Add($"Failed to load customers: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void EditCustomer(Guid customerId)
+    {
+        Navigation.NavigateTo($"/customers/edit/{customerId}");
+    }
+
+    private async Task DeleteCustomer(Customer customer)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Warning",
+            $"Are you sure you want to delete {customer.FullName}?",
+            "Delete",
+            "Cancel");
+
+        // Debug: Log the actual result value
+        //Console.WriteLine($"Delete dialog result: {result}");
+
+               
+        if (result.GetValueOrDefault(false))
+        {
+            try
+            {
+                var success = await CustomerService.DeleteCustomerAsync(customer.Id);
+                if (success)
+                {
+                    Snackbar.Add($"{customer.FullName} has been deleted successfully.", Severity.Success);
+                    await LoadCustomers();
+                }
+                else
+                {
+                    Snackbar.Add("Failed to delete customer. Please try again.", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add(ex.Message, Severity.Error);
+            }
+        }
+        
+        // Force UI refresh
+        StateHasChanged();
+    }
+
+    private string GetAvatarInitials(Customer customer)
+    {
+        if (!string.IsNullOrEmpty(customer.FirstName) && !string.IsNullOrEmpty(customer.LastName))
+        {
+            return $"{customer.FirstName.Substring(0, 1)}{customer.LastName.Substring(0, 1)}";
+        }
+        
+        if (!string.IsNullOrEmpty(customer.Name))
+        {
+            var parts = customer.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2)
+            {
+                return $"{parts[0].Substring(0, 1)}{parts[1].Substring(0, 1)}";
+            }
+            return customer.Name.Substring(0, Math.Min(2, customer.Name.Length));
+        }
+        
+        return "??";
+    }
+}

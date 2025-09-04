@@ -1,0 +1,47 @@
+﻿<MudThemeProvider @ref="@_mudThemeProvider" Theme="_themeService.CurrentTheme" IsDarkMode="_themeService.IsDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not found</PageTitle>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <MudContainer>
+                <MudAlert Severity="Severity.Warning" Class="mt-4">
+                    <MudText Typo="Typo.h6">Page Not Found</MudText>
+                    <MudText>Sorry, there's nothing at this address.</MudText>
+                </MudAlert>
+            </MudContainer>
+        </LayoutView>
+    </NotFound>
+</Router>
+
+@code {
+    private MudThemeProvider? _mudThemeProvider;
+    
+    [Inject] private IThemeService _themeService { get; set; } = default!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _themeService is ThemeService themeService)
+        {
+            await themeService.InitializeAsync();
+            StateHasChanged();
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        _themeService.OnThemeChanged += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        _themeService.OnThemeChanged -= StateHasChanged;
+    }
+}

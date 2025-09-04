@@ -1,0 +1,176 @@
+﻿@implements IDisposable
+@using MudBlazor
+@using MyCustomersApp.Models
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<div class="nav-container">
+    <!-- Main Navigation Links - Always at Top -->
+    <MudNavMenu Class="nav-menu-main">
+        <MudNavLink Href="/" Icon="Icons.Material.Filled.Dashboard" Match="NavLinkMatch.All">
+            Dashboard
+        </MudNavLink>
+        
+        @if (_isAuthenticated)
+        {
+            <MudNavLink Href="/customers" Icon="Icons.Material.Filled.People">
+                👥 Customers
+            </MudNavLink>
+            
+            @if (_currentUser != null && _currentUser.IsAdmin)
+            {
+                <MudNavLink Href="/users" Icon="Icons.Material.Filled.Group">
+                    👤 Users
+                </MudNavLink>
+            }
+        }
+        else
+        {
+            <MudNavLink Href="/login" Icon="Icons.Material.Filled.Login">
+                🔐 Login
+            </MudNavLink>
+            <MudNavLink Href="/register" Icon="Icons.Material.Filled.AppRegistration">
+                📝 Register
+            </MudNavLink>
+        }
+    </MudNavMenu>
+
+    <!-- User Profile Section - At Bottom when authenticated -->
+    @if (_isAuthenticated && _currentUser != null)
+    {
+        <div class="user-profile-section">
+            <MudDivider Class="mb-3" />
+            <div class="user-profile-card">
+                <MudAvatar Color="Color.Primary" Size="Size.Medium" Class="mb-2">
+                    @GetUserInitials(_currentUser)
+                </MudAvatar>
+                <MudText Typo="Typo.body2" Class="user-name">@GetDisplayName(_currentUser)</MudText>
+                <MudText Typo="Typo.caption" Class="user-email">@_currentUser.Email</MudText>
+                
+                <div class="user-actions mt-2">
+                    <MudButton Color="Color.Error" 
+                              Variant="Variant.Text" 
+                              Size="Size.Small"
+                              OnClick="@HandleLogout">LOGOUT</MudButton>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .nav-container {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+    }
+
+    .nav-menu-main {
+        flex-grow: 1;
+        padding-top: 8px;
+    }
+
+    .user-profile-section {
+        margin-top: auto;
+        padding: 16px;
+        background-color: var(--mud-palette-surface);
+    }
+
+    .user-profile-card {
+        text-align: center;
+        padding: 12px;
+        border-radius: 8px;
+        background-color: var(--mud-palette-background);
+    }
+
+    .user-name {
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    .user-email {
+        color: var(--mud-palette-text-secondary);
+        margin-bottom: 8px;
+        word-break: break-all;
+    }
+
+    .user-actions {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .user-actions .mud-button {
+        justify-content: center;
+        text-align: center;
+        width: 100%;
+    }
+
+    /* Fix for button with StartIcon alignment */
+    .user-actions .mud-button-text .mud-button-label {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+    }
+
+</style>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    
+    private bool _isAuthenticated = false;
+    private UserInfo? _currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        if (_isAuthenticated)
+        {
+            _currentUser = await AuthService.GetCurrentUserAsync();
+        }
+        AuthService.AuthStateChanged += OnAuthStateChanged;
+    }
+
+    private async void OnAuthStateChanged(bool isAuthenticated)
+    {
+        _isAuthenticated = isAuthenticated;
+        if (isAuthenticated)
+        {
+            _currentUser = await AuthService.GetCurrentUserAsync();
+        }
+        else
+        {
+            _currentUser = null;
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Snackbar.Add("Logged out successfully", Severity.Success);
+        Navigation.NavigateTo("/");
+    }
+
+    private string GetDisplayName(UserInfo user)
+    {
+        return user.DisplayName;
+    }
+
+    private string GetUserInitials(UserInfo user)
+    {
+        if (!string.IsNullOrEmpty(user.Email))
+        {
+            return user.Email.Substring(0, Math.Min(2, user.Email.Length)).ToUpper();
+        }
+        
+        return "??";
+    }
+
+    public void Dispose()
+    {
+        AuthService.AuthStateChanged -= OnAuthStateChanged;
+    }
+}

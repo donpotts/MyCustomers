@@ -1,0 +1,299 @@
+@page "/customers/create"
+@page "/customers/edit/{CustomerId:guid}"
+@using MudBlazor
+@inject ICustomerService CustomerService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>@(IsEditMode ? "Edit Customer" : "Add Customer")</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium">
+    <div class="d-flex align-center mb-6">
+        <MudIconButton Icon="Icons.Material.Filled.ArrowBack" 
+                      Color="Color.Primary" 
+                      OnClick="@(() => Navigation.NavigateTo("/customers"))" 
+                      Class="mr-3" />
+        <MudText Typo="Typo.h4">@(IsEditMode ? "Edit Customer" : "Add New Customer")</MudText>
+    </div>
+
+    <MudCard Elevation="4">
+        <MudCardContent Class="pa-8">
+            @if (_isLoading)
+            {
+                <div class="d-flex justify-center align-center" style="min-height: 200px;">
+                    <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+                </div>
+            }
+            else
+            {
+                <EditForm Model="@_customer" OnValidSubmit="@HandleSubmit">
+                    <DataAnnotationsValidator />
+
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_customer.Name"
+                                         Label="Full Name"
+                                         Variant="Variant.Outlined"
+                                         Required="true"
+                                         RequiredError="Name is required"
+                                         For="@(() => _customer.Name)"
+                                         Class="mb-4" />
+                        </MudItem>
+
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_customer.FirstName"
+                                         Label="First Name (Optional)"
+                                         Variant="Variant.Outlined"
+                                         For="@(() => _customer.FirstName)"
+                                         Class="mb-4" />
+                        </MudItem>
+                        
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_customer.LastName"
+                                         Label="Last Name (Optional)"
+                                         Variant="Variant.Outlined"
+                                         For="@(() => _customer.LastName)"
+                                         Class="mb-4" />
+                        </MudItem>
+                        
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_customer.Email"
+                                         Label="Email Address"
+                                         Variant="Variant.Outlined"
+                                         InputType="InputType.Email"
+                                         Required="true"
+                                         RequiredError="Email is required"
+                                         For="@(() => _customer.Email)"
+                                         Class="mb-4" />
+                        </MudItem>
+                        
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_customer.Number"
+                                         Label="Phone Number"
+                                         Variant="Variant.Outlined"
+                                         InputType="InputType.Telephone"
+                                         For="@(() => _customer.Number)"
+                                         Class="mb-4" />
+                        </MudItem>
+                        
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_customer.Notes"
+                                         Label="Notes"
+                                         Variant="Variant.Outlined"
+                                         Lines="3"
+                                         For="@(() => _customer.Notes)"
+                                         Class="mb-4" />
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudDivider Class="my-6" />
+
+                    <div class="d-flex justify-end gap-4">
+                        <MudButton Color="Color.Secondary" 
+                                  Variant="Variant.Text" 
+                                  OnClick="@(() => Navigation.NavigateTo("/customers"))">
+                            Cancel
+                        </MudButton>
+                        
+                        <MudButton ButtonType="ButtonType.Submit"
+                                  Color="Color.Primary"
+                                  Variant="Variant.Filled"
+                                  Size="Size.Large"
+                                  StartIcon="@(IsEditMode ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)"
+                                  Disabled="@_isSaving">
+                            @if (_isSaving)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                <span class="ml-2">@(IsEditMode ? "Updating..." : "Adding...")</span>
+                            }
+                            else
+                            {
+                                <span>@(IsEditMode ? "Update Customer" : "Add Customer")</span>
+                            }
+                        </MudButton>
+                    </div>
+                </EditForm>
+            }
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    [Parameter] public Guid? CustomerId { get; set; }
+    
+    private Customer _customer = new();
+    private bool _isLoading = false;
+    private bool _isSaving = false;
+    
+    private bool IsEditMode => CustomerId.HasValue;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsEditMode && CustomerId.HasValue)
+        {
+            await LoadCustomer(CustomerId.Value);
+        }
+        else
+        {
+            // For new customers, initialize with current time
+            // CreatedDate and UpdatedDate will be set properly during HandleSubmit
+            _customer = new Customer();
+        }
+    }
+
+    private async Task LoadCustomer(Guid customerId)
+    {
+        _isLoading = true;
+        try
+        {
+            var customer = await CustomerService.GetCustomerAsync(customerId);
+            if (customer != null)
+            {
+                _customer = customer;
+                
+                // Ensure dates are properly set for existing customers
+                if (_customer.CreatedDate == default)
+                {
+                    _customer.CreatedDate = DateTime.UtcNow;
+                    Console.WriteLine("Warning: Customer had no CreatedDate, setting to current time");
+                }
+                if (_customer.UpdatedDate == default)
+                {
+                    _customer.UpdatedDate = _customer.CreatedDate;
+                    Console.WriteLine("Warning: Customer had no UpdatedDate, setting to CreatedDate");
+                }
+            }
+            else
+            {
+                Snackbar.Add("Customer not found.", Severity.Error);
+                Navigation.NavigateTo("/customers");
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("Failed to load customer. Please try again.", Severity.Error);
+            Navigation.NavigateTo("/customers");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        _isSaving = true;
+        try
+        {
+            Customer? result;
+            
+            if (IsEditMode)
+            {
+                // For updates: keep original CreatedDate, update UpdatedDate
+                _customer.UpdatedDate = DateTime.UtcNow;
+                
+                // Debug: Log what we're updating
+                Console.WriteLine($"Updating customer: Name='{_customer.Name}', Email='{_customer.Email}', Id={_customer.Id}");
+                Console.WriteLine($"Original CreatedDate={_customer.CreatedDate:yyyy-MM-dd HH:mm:ss} UTC, New UpdatedDate={_customer.UpdatedDate:yyyy-MM-dd HH:mm:ss} UTC");
+                
+                result = await CustomerService.UpdateCustomerAsync(_customer);
+                if (result != null)
+                {
+                    Snackbar.Add($"{_customer.FullName} has been updated successfully.", Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add("Failed to update customer. Please try again.", Severity.Error);
+                    return;
+                }
+            }
+            else
+            {
+                // For new customers: set both CreatedDate and UpdatedDate
+                var currentTime = DateTime.UtcNow;
+                _customer.Id = Guid.NewGuid();
+                _customer.CreatedDate = currentTime;
+                _customer.UpdatedDate = currentTime;
+                
+                // Validate and sanitize data
+                if (string.IsNullOrWhiteSpace(_customer.Name))
+                {
+                    Snackbar.Add("Customer name is required.", Severity.Error);
+                    return;
+                }
+                
+                // Trim whitespace from all string properties
+                _customer.Name = _customer.Name.Trim();
+                _customer.Email = _customer.Email?.Trim() ?? "";
+                _customer.FirstName = _customer.FirstName?.Trim();
+                _customer.LastName = _customer.LastName?.Trim();
+                _customer.Number = _customer.Number?.Trim();
+                _customer.Notes = _customer.Notes?.Trim();
+                
+                // Validate email format if provided
+                if (!string.IsNullOrEmpty(_customer.Email) && !IsValidEmail(_customer.Email))
+                {
+                    Snackbar.Add("Please enter a valid email address.", Severity.Error);
+                    return;
+                }
+                
+                // Debug: Log what we're sending
+                Console.WriteLine($"Creating customer: Name='{_customer.Name}', Email='{_customer.Email}', Id={_customer.Id}");
+                Console.WriteLine($"FirstName='{_customer.FirstName}', LastName='{_customer.LastName}', Number='{_customer.Number}'");
+                Console.WriteLine($"CreatedDate={_customer.CreatedDate:yyyy-MM-dd HH:mm:ss} UTC, UpdatedDate={_customer.UpdatedDate:yyyy-MM-dd HH:mm:ss} UTC");
+                
+                try 
+                {
+                    result = await CustomerService.CreateCustomerAsync(_customer);
+                    if (result != null)
+                    {
+                        Snackbar.Add($"{_customer.FullName} has been added successfully.", Severity.Success);
+                    }
+                    else
+                    {
+                        Snackbar.Add("Failed to add customer. The server returned an error. Check the browser console for details.", Severity.Error);
+                        return;
+                    }
+                }
+                catch (HttpRequestException httpEx)
+                {
+                    Snackbar.Add($"Network error: {httpEx.Message}. Please check your connection and server status.", Severity.Error);
+                    return;
+                }
+                catch (TaskCanceledException)
+                {
+                    Snackbar.Add("Request timed out. Please try again.", Severity.Error);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"Unexpected error: {ex.Message}", Severity.Error);
+                    return;
+                }
+            }
+
+            Navigation.NavigateTo("/customers");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"An error occurred while {(IsEditMode ? "updating" : "adding")} the customer.", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+    
+    private bool IsValidEmail(string email)
+    {
+        try
+        {
+            var addr = new System.Net.Mail.MailAddress(email);
+            return addr.Address == email;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+}

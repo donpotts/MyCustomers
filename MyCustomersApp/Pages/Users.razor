@@ -1,0 +1,471 @@
+@page "/users"
+@using MudBlazor
+@inject IUserService UserService
+@inject IAuthService AuthService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+
+<PageTitle>Users</PageTitle>
+
+@if (!_isAuthorized)
+{
+    <MudContainer MaxWidth="MaxWidth.False" Class="pa-6">
+        <MudCard Elevation="2" Class="pa-8">
+            <MudCardContent Class="text-center">
+                <MudIcon Icon="Icons.Material.Filled.Lock" Size="Size.Large" Color="Color.Warning" Class="mb-4" />
+                <MudText Typo="Typo.h5" Class="mb-2">Access Denied</MudText>
+                <MudText Color="Color.Secondary" Class="mb-4">
+                    You need administrator privileges to access the user management section.
+                </MudText>
+                <MudButton Href="/" 
+                          Color="Color.Primary" 
+                          Variant="Variant.Filled" 
+                          StartIcon="Icons.Material.Filled.Home">
+                    Back to Home
+                </MudButton>
+            </MudCardContent>
+        </MudCard>
+    </MudContainer>
+}
+else
+{
+<div class="d-flex justify-space-between align-center mb-6">
+    <MudText Typo="Typo.h3">Users</MudText>
+    <div class="d-flex gap-2">
+        <MudToggleIconButton @bind-Toggled="@_isCardView"
+                           Icon="@Icons.Material.Filled.GridView"
+                           ToggledIcon="@Icons.Material.Filled.ViewList"
+                           title="Toggle View"
+                           toggledTitle="Toggle View" />
+        <!-- Mobile version - Icon only, smaller size -->
+        <MudIconButton Href="/users/create" 
+              Icon="@Icons.Material.Filled.Add"
+              Color="Color.Primary" 
+              Variant="Variant.Filled" 
+              Size="Size.Small"
+              Class="d-flex d-sm-none"
+              Title="Add User" />
+        <!-- Desktop version - Full button with text -->
+        <MudButton Href="/users/create" 
+                  Color="Color.Primary" 
+                  Variant="Variant.Filled" 
+                  StartIcon="@Icons.Material.Filled.Add"
+                  Class="d-none d-sm-inline-flex">
+            Add User
+        </MudButton>
+    </div>
+</div>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-0">
+    <MudTextField @bind-Value="_searchString"
+                  Placeholder="Search users..."
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="Icons.Material.Filled.Search"
+                  IconSize="Size.Medium"
+                  Class="mb-4"
+                  Clearable="true"
+                  Immediate="true"
+                  OnClearButtonClick="@(() => SearchChanged(string.Empty))" />
+
+    @if (_isLoading)
+    {
+        <div class="d-flex justify-center align-center" style="min-height: 300px;">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+        </div>
+    }
+    else if (_users?.Any() != true)
+    {
+        <MudCard Elevation="2" Class="pa-8">
+            <MudCardContent Class="text-center">
+                <MudIcon Icon="Icons.Material.Filled.PeopleOutline" Size="Size.Large" Color="Color.Secondary" Class="mb-4" />
+                <MudText Typo="Typo.h6" Class="mb-2">No users found</MudText>
+                <MudText Color="Color.Secondary" Class="mb-4">Get started by adding your first user</MudText>
+                <MudButton Href="/users/create" 
+                          Color="Color.Primary" 
+                          Variant="Variant.Filled" 
+                          StartIcon="Icons.Material.Filled.Add">
+                    Add First User
+                </MudButton>
+            </MudCardContent>
+        </MudCard>
+    }
+    else
+    {
+        @if (_isCardView)
+        {
+            <MudGrid>
+                @foreach (var user in PaginatedUsers)
+                {
+                    <MudItem xs="12" sm="6" md="6" lg="4">
+                        <MudCard Elevation="4" Class="mud-card-hover user-card" @ondblclick="@(() => EditUser(user.Id))" Style="cursor: pointer;">
+                            <MudCardContent Class="user-card-content">
+                                <div class="d-flex align-center mb-3">
+                                    <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mr-3">
+                                        @GetAvatarInitials(user)
+                                    </MudAvatar>
+                                    <div class="flex-grow-1">
+                                        <MudText Typo="Typo.h6">@GetDisplayName(user)</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">@user.Email</MudText>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex align-center mb-2">
+                                    <MudIcon Icon="@(user.IsAdmin ? Icons.Material.Filled.AdminPanelSettings : Icons.Material.Filled.Person)" Size="Size.Small" Class="mr-2" />
+                                    <MudText Typo="Typo.body2">@(user.IsAdmin ? "Administrator" : "Standard User")</MudText>
+                                </div>
+                                
+                                <div class="d-flex align-center mb-2">
+                                    <MudIcon Icon="Icons.Material.Filled.Badge" Size="Size.Small" Class="mr-2" />
+                                    <MudText Typo="Typo.body2">@user.Id</MudText>
+                                </div>
+                                
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    User ID: @user.Id.Substring(0, Math.Min(8, user.Id.Length))...
+                                </MudText>
+                            </MudCardContent>
+                            
+                            <MudCardActions Class="d-flex justify-end pa-4 mt-auto">
+                                <div class="d-flex gap-2">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                  Color="Color.Primary"
+                                                  Variant="Variant.Filled"
+                                                  Size="Size.Medium"
+                                                  title="Edit User"
+                                                  OnClick="@(() => EditUser(user.Id))" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                  Color="Color.Error"
+                                                  Variant="Variant.Filled"
+                                                  Size="Size.Medium"
+                                                  title="Delete User"
+                                                  OnClick="@(async () => await DeleteUser(user))" />
+                                </div>
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+            
+            <MudCard Elevation="2" Class="mt-4">
+                <MudCardContent Class="py-2">
+                    <div class="d-flex justify-space-between align-center flex-wrap">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-0 mr-4">
+                            Showing @((_currentPage - 1) * _pageSize + 1)-@Math.Min(_currentPage * _pageSize, FilteredUsers.Count()) of @FilteredUsers.Count() users
+                        </MudText>
+                        <div class="d-flex align-center">
+                            <MudPagination Count="@TotalPages" 
+                                         SelectedChanged="OnPageChanged" 
+                                         Selected="@_currentPage" 
+                                         Color="Color.Primary" 
+                                         Size="Size.Medium" 
+                                         Class="mb-0 mr-4" />
+                            <MudSelect T="int" 
+                                     Label="Items per page" 
+                                     Value="_pageSize" 
+                                     ValueChanged="PageSizeChanged"
+                                     Dense="true" 
+                                     Class="ma-0" 
+                                     Style="width:120px;" 
+                                     AnchorOrigin="Origin.BottomCenter">
+                                <MudSelectItem Value="6">6</MudSelectItem>
+                                <MudSelectItem Value="12">12</MudSelectItem>
+                                <MudSelectItem Value="18">18</MudSelectItem>
+                                <MudSelectItem Value="36">36</MudSelectItem>
+                                <MudSelectItem Value="50">50</MudSelectItem>
+                                <MudSelectItem Value="100">100</MudSelectItem>
+                            </MudSelect>
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        }
+        else
+        {
+            <MudCard Elevation="4">
+                <MudTable Items="@FilteredUsers" 
+                         Hover="true" 
+                         Striped="true" 
+                         Dense="true"
+                         FixedHeader="true"
+                         Height="60vh"
+                         Bordered="false"
+                         Outlined="false"
+                         ServerData="@(new Func<TableState, CancellationToken, Task<TableData<UserInfo>>>(ServerReload))"
+                         Virtualize="true">
+                    <HeaderContent>
+                        <MudTh>Name</MudTh>
+                        <MudTh>Email</MudTh>
+                        <MudTh>Role</MudTh>
+                        <MudTh>User ID</MudTh>
+                        <MudTh Style="width: 120px;">Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd @ondblclick="@(() => EditUser(context.Id))" Style="cursor: pointer;">
+                            <div class="d-flex align-center">
+                                <MudAvatar Color="Color.Primary" Size="Size.Small" Class="mr-3">
+                                    @GetAvatarInitials(context)
+                                </MudAvatar>
+                                @GetDisplayName(context)
+                            </div>
+                        </MudTd>
+                        <MudTd @ondblclick="@(() => EditUser(context.Id))" Style="cursor: pointer;">@context.Email</MudTd>
+                        <MudTd @ondblclick="@(() => EditUser(context.Id))" Style="cursor: pointer;">
+                            @if (context.IsAdmin)
+                            {
+                                <MudChip T="string" Color="Color.Success" Size="Size.Small">Admin</MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Color="Color.Default" Size="Size.Small">User</MudChip>
+                            }
+                        </MudTd>
+                        <MudTd @ondblclick="@(() => EditUser(context.Id))" Style="cursor: pointer;">@context.Id.Substring(0, Math.Min(8, context.Id.Length))...</MudTd>
+                        <MudTd>
+                            <div class="d-flex gap-1">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                              Color="Color.Primary"
+                                              Variant="Variant.Filled"
+                                              Size="Size.Small"
+                                              title="Edit User"
+                                              OnClick="@(() => EditUser(context.Id))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                              Color="Color.Error"
+                                              Variant="Variant.Filled"
+                                              Size="Size.Small"
+                                              title="Delete User"
+                                              OnClick="@(async () => await DeleteUser(context))" />
+                            </div>
+                        </MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new int[] { 6, 12, 18, 36, 50, 100 }" 
+                                     RowsPerPageString="Users per page:" />
+                    </PagerContent>
+                </MudTable>
+            </MudCard>
+        }
+    }
+</MudContainer>
+}
+
+<style>
+    .mud-card-hover {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
+
+    .mud-card-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+
+    .user-card {
+        height: 280px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .user-card-content {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+    }
+
+    .user-card-content > div:last-child {
+        margin-top: auto;
+    }
+</style>
+
+@code {
+    private IEnumerable<UserInfo>? _users;
+    private bool _isLoading = true;
+    private bool _isCardView = true;
+    private string _searchString = string.Empty;
+    private bool _isAuthorized = false;
+    
+    // Pagination settings
+    private int _pageSize = 6; // initial page size for cards
+    private int _currentPage = 1;
+    private int _totalCount = 0;
+    
+    // Table pagination
+    private MudBlazor.TableState _tableState = new MudBlazor.TableState();
+
+    private IEnumerable<UserInfo> FilteredUsers
+    {
+        get
+        {
+            if (_users == null) return Array.Empty<UserInfo>();
+            
+            var filtered = string.IsNullOrWhiteSpace(_searchString) 
+                ? _users 
+                : _users.Where(u => 
+                    GetDisplayName(u).Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+                    (u.Email?.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    u.Id.Contains(_searchString, StringComparison.OrdinalIgnoreCase));
+
+            return filtered;
+        }
+    }
+    
+    private IEnumerable<UserInfo> PaginatedUsers 
+    {
+        get
+        {
+            if (_users == null) return Array.Empty<UserInfo>();
+            
+            var filtered = FilteredUsers;
+            var skip = (_currentPage - 1) * _pageSize;
+            return filtered.Skip(skip).Take(_pageSize);
+        }
+    }
+
+    private int TotalPages => (int)Math.Ceiling(FilteredUsers.Count() / (double)_pageSize);
+    
+    private void GoToPage(int page)
+    {
+        _currentPage = Math.Max(1, Math.Min(page, TotalPages));
+    }
+    
+    private async Task OnPageChanged(int page)
+    {
+        _currentPage = page;
+        await LoadUsers();
+    }
+    
+    private async Task PageSizeChanged(int size)
+    {
+        _pageSize = size;
+        _currentPage = 1; // Reset to first page when page size changes
+        await LoadUsers();
+    }
+    
+    private void SearchChanged(string searchText)
+    {
+        _searchString = searchText;
+        _currentPage = 1; // Reset to first page when search changes
+        StateHasChanged();
+    }
+    
+    private async Task<TableData<UserInfo>> ServerReload(MudBlazor.TableState state, CancellationToken cancellationToken)
+    {
+        _tableState = state;
+        
+        await Task.Delay(1, cancellationToken); // Simulate server call
+        
+        // For now, return all users since we don't have paginated UserService
+        // This would need to be updated when UserService supports pagination
+        var items = FilteredUsers.ToArray();
+        var total = items.Length;
+
+        return new TableData<UserInfo>() 
+        { 
+            TotalItems = total, 
+            Items = items 
+        };
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckAuthorization();
+        if (_isAuthorized)
+        {
+            await LoadUsers();
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        _isLoading = true;
+        try
+        {
+            // Since UserService doesn't support pagination yet, we'll load all users
+            // and handle pagination on the frontend
+            _users = await UserService.GetUsersAsync();
+            var usersList = _users?.ToList() ?? new List<UserInfo>();
+            
+            // Update total count based on all users
+            _totalCount = usersList.Count;
+        }
+        catch (Exception ex)
+        {
+            // Surface error to the user and log for debugging
+            Snackbar.Add($"Failed to load users: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task CheckAuthorization()
+    {
+        try
+        {
+            var currentUser = await AuthService.GetCurrentUserAsync();
+            _isAuthorized = currentUser != null && currentUser.IsAdmin;
+        }
+        catch (Exception ex)
+        {
+            _isAuthorized = false;
+            Snackbar.Add("Failed to verify authorization.", Severity.Error);
+        }
+    }
+
+    private void EditUser(string userId)
+    {
+        Navigation.NavigateTo($"/users/edit/{userId}");
+    }
+
+    private async Task DeleteUser(UserInfo user)
+    {
+        var result = await DialogService.ShowMessageBox(
+            "Warning",
+            $"Are you sure you want to delete {GetDisplayName(user)}?",
+            "Delete",
+            "Cancel");
+
+        // Debug: Log the actual result value
+        //Console.WriteLine($"Delete dialog result: {result}");
+        
+        if (result.GetValueOrDefault(false))
+        {
+            try
+            {
+                var success = await UserService.DeleteUserAsync(user.Id);
+                if (success)
+                {
+                    Snackbar.Add($"{GetDisplayName(user)} has been deleted successfully.", Severity.Success);
+                    await LoadUsers();
+                }
+                else
+                {
+                    Snackbar.Add("Failed to delete user. Please try again.", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add(ex.Message, Severity.Error);
+            }
+        }
+        
+        // Force UI refresh
+        StateHasChanged();
+    }
+
+    private string GetDisplayName(UserInfo user)
+    {
+        return user.DisplayName;
+    }
+
+    private string GetAvatarInitials(UserInfo user)
+    {
+        if (!string.IsNullOrEmpty(user.Email))
+        {
+            return user.Email.Substring(0, Math.Min(2, user.Email.Length)).ToUpper();
+        }
+        
+        return "??";
+    }
+}
